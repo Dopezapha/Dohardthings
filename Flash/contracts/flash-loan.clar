@@ -13,6 +13,11 @@
 (define-constant err-timelock-not-expired (err u108))
 (define-constant err-unsupported-token (err u109))
 (define-constant err-borrowing-limit-exceeded (err u110))
+(define-constant err-invalid-amount (err u111))
+(define-constant err-amount-too-high (err u112))
+(define-constant err-invalid-token (err u113))
+(define-constant err-invalid-limit (err u114))
+(define-constant err-limit-too-high (err u115))
 
 ;; Define fungible tokens
 (define-fungible-token governance-token)
@@ -26,7 +31,7 @@
 (define-data-var timelock-period uint u1440) ;; 24 hours in blocks (assuming 1 block per minute)
 
 ;; Define data maps
-(define-map balances {user: principal, token: (string-ascii 32)} uint)
+(define-map balances {user: principal, token: principal} uint)
 (define-map whitelist principal bool)
 (define-map proposals
   uint
@@ -41,6 +46,7 @@
 )
 (define-map user-votes {user: principal, proposal-id: uint} bool)
 (define-map borrowing-limits principal uint)
+(define-map supported-tokens principal bool)
 
 ;; Define custom token type
 (define-trait custom-token
@@ -50,14 +56,27 @@
   )
 )
 
+;; Helper function to check if a token is supported
+(define-private (is-valid-token (token <custom-token>))
+  (default-to false (map-get? supported-tokens (contract-of token)))
+)
+
 ;; Governance token minting function (simplified for demonstration)
 (define-public (mint-governance-token (amount uint))
-  (ft-mint? governance-token amount tx-sender)
+  (begin
+    (asserts! (> amount u0) err-invalid-amount)
+    (asserts! (<= amount u1000000000) err-amount-too-high) ;; Example max amount
+    (ft-mint? governance-token amount tx-sender)
+  )
 )
 
 ;; Flash token minting function (simplified for demonstration)
 (define-public (mint-flash-token (amount uint))
-  (ft-mint? flash-token amount tx-sender)
+  (begin
+    (asserts! (> amount u0) err-invalid-amount)
+    (asserts! (<= amount u1000000000) err-amount-too-high) ;; Example max amount
+    (ft-mint? flash-token amount tx-sender)
+  )
 )
 
 ;; Public function to deposit tokens
@@ -68,6 +87,8 @@
             (current-balance (default-to u0 (map-get? balances {user: sender, token: (contract-of token)})))
         )
         (asserts! (not (var-get paused)) err-paused)
+        (asserts! (> amount u0) err-invalid-amount)
+        (asserts! (is-valid-token token) err-invalid-token)
         (try! (contract-call? token transfer? amount sender (as-contract tx-sender)))
         (map-set balances {user: sender, token: (contract-of token)} (+ current-balance amount))
         (var-set total-liquidity (+ (var-get total-liquidity) amount))
@@ -84,6 +105,8 @@
             (current-balance (default-to u0 (map-get? balances {user: sender, token: (contract-of token)})))
         )
         (asserts! (not (var-get paused)) err-paused)
+        (asserts! (> amount u0) err-invalid-amount)
+        (asserts! (is-valid-token token) err-invalid-token)
         (asserts! (<= amount current-balance) err-insufficient-balance)
         (try! (as-contract (contract-call? token transfer? amount tx-sender sender)))
         (map-set balances {user: sender, token: (contract-of token)} (- current-balance amount))
@@ -102,19 +125,30 @@
             (user-limit (default-to u0 (map-get? borrowing-limits recipient)))
         )
         (asserts! (not (var-get paused)) err-paused)
+        (asserts! (> amount u0) err-invalid-amount)
+        (asserts! (is-valid-token token) err-invalid-token)
         (asserts! (<= amount contract-balance) err-insufficient-balance)
         (asserts! (default-to false (map-get? whitelist recipient)) err-owner-only)
         (asserts! (<= amount user-limit) err-borrowing-limit-exceeded)
         (try! (as-contract (contract-call? token transfer? amount tx-sender recipient)))
-        (let
-            (
-                (repaid (unwrap! (contract-call? recipient execute-flash-loan amount fee token) err-repay-failed))
-            )
-            (asserts! (is-eq repaid true) err-repay-failed)
-            (var-set total-liquidity (+ (var-get total-liquidity) fee))
-            (print {event: "flash-loan", recipient: recipient, amount: amount, fee: fee, token: (contract-of token)})
-            (ok true)
+        (print {event: "flash-loan", recipient: recipient, amount: amount, fee: fee, token: (contract-of token)})
+        (ok {amount: amount, fee: fee})
+    )
+)
+
+;; Define a new public function for repaying the flash loan
+(define-public (repay-flash-loan (amount uint) (fee uint) (token <custom-token>))
+    (let
+        (
+            (total-repayment (+ amount fee))
         )
+        (asserts! (> amount u0) err-invalid-amount)
+        (asserts! (> fee u0) err-invalid-amount)
+        (asserts! (is-valid-token token) err-invalid-token)
+        (try! (contract-call? token transfer? total-repayment tx-sender (as-contract tx-sender)))
+        (var-set total-liquidity (+ (var-get total-liquidity) fee))
+        (print {event: "flash-loan-repaid", repayer: tx-sender, amount: amount, fee: fee, token: (contract-of token)})
+        (ok true)
     )
 )
 
@@ -126,6 +160,7 @@
             (proposer-balance (ft-get-balance governance-token tx-sender))
         )
         (asserts! (>= proposer-balance u100000000) err-not-enough-votes) ;; Require 100 governance tokens to create a proposal
+        (asserts! (> (len description) u0) err-invalid-amount)
         (map-set proposals proposal-id
             {
                 proposer: tx-sender,
@@ -181,15 +216,29 @@
 (define-public (set-borrowing-limit (user principal) (limit uint))
     (begin
         (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+        (asserts! (> limit u0) err-invalid-limit)
+        (asserts! (<= limit u1000000000) err-limit-too-high) ;; Example max limit
         (map-set borrowing-limits user limit)
         (print {event: "borrowing-limit-set", user: user, limit: limit})
         (ok true)
     )
 )
 
-;; Read-only functions (unchanged)
-(define-read-only (get-contract-balance (token <custom-token>))
-    (contract-call? token get-balance (as-contract tx-sender))
+;; Admin function to add supported token
+(define-public (add-supported-token (token principal))
+    (begin
+        (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+        (map-set supported-tokens token true)
+        (print {event: "token-supported", token: token})
+        (ok true)
+    )
+)
+
+(define-public (get-contract-balance (token <custom-token>))
+    (begin
+        (asserts! (is-valid-token token) err-invalid-token)
+        (contract-call? token get-balance (as-contract tx-sender))
+    )
 )
 
 (define-read-only (get-user-balance (user principal) (token <custom-token>))
