@@ -45,6 +45,44 @@
 (define-constant err-prediction-terminated (err u105))
 (define-constant err-invalid-choice (err u106))
 
+;; Custom max function
+(define-private (max (a uint) (b uint))
+  (if (> a b) a b)
+)
+
+;; Helper function to safely get an element from a list or return a default value
+(define-private (get-or-default (lst (list 20 uint)) (index uint) (default uint))
+  (default-to default (element-at? lst index))
+)
+
+;; Custom take function
+(define-private (take (n uint) (lst (list 20 uint)))
+  (let ((length (len lst)))
+    (if (>= n length)
+      lst
+      (concat (list) (unwrap-panic (slice? lst u0 n)))
+    )
+  )
+)
+
+;; Custom drop function
+(define-private (drop (n uint) (lst (list 20 uint)))
+  (let ((length (len lst)))
+    (if (>= n length)
+      (list)
+      (concat (list) (unwrap-panic (slice? lst n length)))
+    )
+  )
+)
+
+;; Helper function to update a value at a specific index in a list
+(define-private (update-list-at (lst (list 20 uint)) (index uint) (value uint))
+  (let ((prefix (take index lst))
+        (suffix (drop (+ index u1) lst)))
+    (unwrap-panic (as-max-len? (concat (concat prefix (list value)) suffix) u20))
+  )
+)
+
 ;; Functions
 
 ;; Create a new prediction market
@@ -52,8 +90,10 @@
   (let
     (
       (prediction-id (var-get prediction-counter))
+      (choice-count (len choices))
+      (initial-totals (list u0 u0 u0 u0 u0 u0 u0 u0 u0 u0 u0 u0 u0 u0 u0 u0 u0 u0 u0 u0))
     )
-    (asserts! (> (len choices) u1) err-invalid-choice)
+    (asserts! (> choice-count u1) err-invalid-choice)
     (map-set prediction-markets
       { prediction-id: prediction-id }
       {
@@ -61,7 +101,7 @@
         details: details,
         closing-block: closing-block,
         result: none,
-        option-totals: (list-repeat u0 (len choices)),
+        option-totals: initial-totals,
         is-finalized: false,
         is-terminated: false
       }
@@ -83,7 +123,7 @@
     (
       (market (unwrap! (map-get? prediction-markets { prediction-id: prediction-id }) (err u404)))
       (choices (unwrap! (map-get? prediction-choices { prediction-id: prediction-id }) (err u404)))
-      (existing-wager (default-to { option-amounts: (list-repeat u0 (len (get choices choices))) } (map-get? wagers { prediction-id: prediction-id, participant: tx-sender })))
+      (existing-wager (default-to { option-amounts: (list u0 u0 u0 u0 u0 u0 u0 u0 u0 u0 u0 u0 u0 u0 u0 u0 u0 u0 u0 u0) } (map-get? wagers { prediction-id: prediction-id, participant: tx-sender })))
     )
     (asserts! (not (get is-finalized market)) err-already-finalized)
     (asserts! (not (get is-terminated market)) err-prediction-terminated)
@@ -93,8 +133,12 @@
     
     (let
       (
-        (updated-option-totals (replace-at? (get option-totals market) choice-index (+ (unwrap! (element-at? (get option-totals market) choice-index) err-invalid-choice) wager-amount)))
-        (updated-wager-amounts (replace-at? (get option-amounts existing-wager) choice-index (+ (unwrap! (element-at? (get option-amounts existing-wager) choice-index) err-invalid-choice) wager-amount)))
+        (current-option-total (get-or-default (get option-totals market) choice-index u0))
+        (updated-option-total (+ current-option-total wager-amount))
+        (updated-option-totals (update-list-at (get option-totals market) choice-index updated-option-total))
+        (current-wager-amount (get-or-default (get option-amounts existing-wager) choice-index u0))
+        (updated-wager-amount (+ current-wager-amount wager-amount))
+        (updated-wager-amounts (update-list-at (get option-amounts existing-wager) choice-index updated-wager-amount))
       )
       (map-set prediction-markets { prediction-id: prediction-id }
         (merge market { option-totals: updated-option-totals })
@@ -164,14 +208,14 @@
     (asserts! (< choice-index (len (get option-amounts participant-wager))) err-invalid-choice)
     (let
       (
-        (current-wager-amount (unwrap! (element-at? (get option-amounts participant-wager) choice-index) err-invalid-choice))
+        (current-wager-amount (get-or-default (get option-amounts participant-wager) choice-index u0))
       )
       (asserts! (>= current-wager-amount withdrawal-amount) err-invalid-wager)
       
       (let
         (
-          (updated-option-totals (replace-at? (get option-totals market) choice-index (- (unwrap! (element-at? (get option-totals market) choice-index) err-invalid-choice) withdrawal-amount)))
-          (updated-wager-amounts (replace-at? (get option-amounts participant-wager) choice-index (- current-wager-amount withdrawal-amount)))
+          (updated-option-totals (update-list-at (get option-totals market) choice-index (- (get-or-default (get option-totals market) choice-index u0) withdrawal-amount)))
+          (updated-wager-amounts (update-list-at (get option-amounts participant-wager) choice-index (- current-wager-amount withdrawal-amount)))
         )
         (map-set prediction-markets { prediction-id: prediction-id }
           (merge market { option-totals: updated-option-totals })
@@ -208,8 +252,8 @@
       (let
         (
           (result-index (unwrap! (get result market) err-not-finalized))
-          (winning-amount (unwrap! (element-at? (get option-amounts participant-wager) result-index) err-invalid-choice))
-          (total-winning-pool (unwrap! (element-at? (get option-totals market) result-index) err-invalid-choice))
+          (winning-amount (get-or-default (get option-amounts participant-wager) result-index u0))
+          (total-winning-pool (get-or-default (get option-totals market) result-index u0))
           (total-pool (fold + (get option-totals market) u0))
           (payout (/ (* winning-amount total-pool) total-winning-pool))
           (commission (/ (* payout commission-rate) u100))
@@ -223,24 +267,63 @@
 )
 
 ;; Time-based automatic finalization (this function should be called periodically)
-(define-public (auto-finalize-predictions)
+(define-public (auto-finalize-predictions (max-iterations uint))
   (let
     (
-      (current-block block-height)
+      (current-prediction-id (var-get prediction-counter))
+      (initial-state { current-id: u0, max-id: current-prediction-id, iterations-left: max-iterations })
     )
-    (filter finalize-if-due
-      (map-to-list prediction-markets)
+    (ok (get current-id (fold auto-finalize-loop 
+                              (list initial-state)
+                              initial-state)))
+  )
+)
+
+(define-private (auto-finalize-loop 
+  (current-state { current-id: uint, max-id: uint, iterations-left: uint }) 
+  (acc { current-id: uint, max-id: uint, iterations-left: uint })
+)
+  (let (
+    (current-id (get current-id current-state))
+    (max-id (get max-id current-state))
+    (iterations-left (get iterations-left current-state))
+  )
+    (if (and (< current-id max-id) (> iterations-left u0))
+      (let
+        (
+          (market (map-get? prediction-markets { prediction-id: current-id }))
+        )
+        (if (is-some market)
+          (let
+            (
+              (finalized (match market market-data (finalize-if-due current-id market-data) false))
+            )
+            { 
+              current-id: (+ current-id u1),
+              max-id: max-id,
+              iterations-left: (- iterations-left u1)
+            }
+          )
+          { 
+            current-id: (+ current-id u1),
+            max-id: max-id,
+            iterations-left: (- iterations-left u1)
+          }
+        )
+      )
+      current-state
     )
   )
 )
 
-(define-private (finalize-if-due (market { prediction-id: uint, query: (string-ascii 256), details: (string-ascii 1024), closing-block: uint, result: (optional uint), option-totals: (list 20 uint), is-finalized: bool, is-terminated: bool }))
+(define-private (finalize-if-due (prediction-id uint) (market { query: (string-ascii 256), details: (string-ascii 1024), closing-block: uint, result: (optional uint), option-totals: (list 20 uint), is-finalized: bool, is-terminated: bool }))
   (if (and (>= block-height (get closing-block market)) (not (get is-finalized market)) (not (get is-terminated market)))
     (let
       (
         (winning-choice (find-winning-choice (get option-totals market)))
       )
-      (map-set prediction-markets { prediction-id: (get prediction-id market) }
+      (map-set prediction-markets 
+        { prediction-id: prediction-id }
         (merge market {
           result: (some winning-choice),
           is-finalized: true
