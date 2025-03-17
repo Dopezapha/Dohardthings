@@ -1,54 +1,64 @@
-import React, { useState, useEffect } from 'react';
-import Loading from './Loading';
-import ErrorMessage from './ErrorMessage';
+import React from 'react';
 
-const TransactionHistory = () => {
-  const [transactions, setTransactions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+const TransactionHistory = ({ transactions = [] }) => {
+  if (transactions.length === 0) {
+    return (
+      <div className="transaction-history">
+        <div className="empty-state">
+          <p>No transactions found for this wallet.</p>
+        </div>
+      </div>
+    );
+  }
 
-  useEffect(() => {
-    fetchTransactions(currentPage);
-  }, [currentPage]);
+  // Format timestamp to a readable date
+  const formatDate = (timestamp) => {
+    const date = new Date(timestamp);
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+  };
 
-  const fetchTransactions = async (page) => {
-    setLoading(true);
-    try {
-      // TODO: Implement API call to fetch transactions
-      // const response = await api.getTransactions(page);
-      // setTransactions(response.transactions);
-      // setTotalPages(response.totalPages);
-      setLoading(false);
-    } catch (err) {
-      setError('Failed to fetch transactions');
-      setLoading(false);
+  // Format transaction type to be more readable
+  const formatType = (type) => {
+    switch (type) {
+      case 'token_transfer':
+        return 'Token Transfer';
+      case 'contract_call':
+        return 'Contract Call';
+      case 'smart_contract':
+        return 'Smart Contract';
+      default:
+        return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     }
   };
 
-  if (loading) return <Loading />;
-  if (error) return <ErrorMessage message={error} />;
-
   return (
     <div className="transaction-history">
-      <h2>Transaction History</h2>
       {transactions.map((tx) => (
         <div key={tx.id} className="transaction-item">
-          <span className="transaction-type">{tx.type}</span>
-          <span className="transaction-amount">{tx.amount} STX</span>
+          <div className="transaction-details">
+            <div className="transaction-type">{formatType(tx.type)}</div>
+            <div className="transaction-date">{formatDate(tx.timestamp)}</div>
+            <div className="transaction-status" data-status={tx.status.toLowerCase()}>
+              {tx.status}
+            </div>
+          </div>
+          {tx.amount > 0 && (
+            <div className="transaction-amount">
+              {tx.amount.toLocaleString()} STX
+            </div>
+          )}
         </div>
       ))}
-      <div className="pagination">
-        {[...Array(totalPages).keys()].map((page) => (
-          <button
-            key={page + 1}
-            onClick={() => setCurrentPage(page + 1)}
-            className={currentPage === page + 1 ? 'active' : ''}
-          >
-            {page + 1}
-          </button>
-        ))}
+      
+      <div className="transaction-footer">
+        <a 
+          href={`https://explorer.stacks.co/address/${transactions[0]?.sender}?chain=testnet`} 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="view-all-link"
+        >
+          View all transactions in Explorer
+        </a>
       </div>
     </div>
   );

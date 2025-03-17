@@ -1,21 +1,32 @@
-import { useState } from 'react';
+"use client"
 
-const useForm = (initialState = {}) => {
-  const [values, setValues] = useState(initialState);
+import { useState } from "react"
 
-  const handleChange = (event) => {
-    const { name, value } = event.target;
-    setValues((prevValues) => ({
-      ...prevValues,
-      [name]: value,
-    }));
-  };
+/**
+ * Custom hook for form handling
+ * @param {Object} initialValues - Initial form values
+ * @returns {Array} - [formValues, handleChange, resetForm]
+ */
+const useForm = (initialValues = {}) => {
+  const [values, setValues] = useState(initialValues)
+
+  const handleChange = (e) => {
+    const { name, value, type } = e.target
+
+    // Handle different input types appropriately
+    const processedValue = type === "number" ? (value === "" ? "" : Number.parseFloat(value)) : value
+
+    setValues({
+      ...values,
+      [name]: processedValue,
+    })
+  }
 
   const resetForm = () => {
-    setValues(initialState);
-  };
+    setValues(initialValues)
+  }
 
-  return [values, handleChange, resetForm];
-};
+  return [values, handleChange, resetForm]
+}
 
 export default useForm;

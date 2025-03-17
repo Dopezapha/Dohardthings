@@ -1,26 +1,9 @@
-import React from 'react';
-
-const Button = ({ 
-  children, 
-  onClick, 
-  type = 'button', 
-  disabled = false, 
-  className = '', 
-  variant = 'primary' 
-}) => {
-  const baseClass = 'btn';
-  const variantClass = `btn-${variant}`;
-
+const Button = ({ children, type = "button", className = "", ...props }) => {
   return (
-    <button
-      type={type}
-      onClick={onClick}
-      disabled={disabled}
-      className={`${baseClass} ${variantClass} ${className}`}
-    >
+    <button type={type} className={`btn-primary ${className} ${props.disabled ? "disabled" : ""}`} {...props}>
       {children}
     </button>
-  );
-};
+  )
+}
 
 export default Button;

@@ -4,10 +4,9 @@
   "private": true,
   "dependencies": {
     "@reduxjs/toolkit": "^2.2.7",
-    "@stacks/auth": "^6.16.1",
-    "@stacks/connect-react": "^22.4.2",
-    "@stacks/network": "^6.16.0",
-    "@stacks/transactions": "^6.16.1",
+    "@stacks/connect-react": "^23.0.9",
+    "@stacks/network": "^7.0.2",
+    "@stacks/transactions": "^7.0.5",
     "@stacks/ui": "^7.10.0",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^12.1.5",
@@ -17,9 +16,9 @@
     "react-dom": "^17.0.2",
     "react-redux": "^7.2.6",
     "react-router-dom": "^6.26.2",
-    "react-scripts": "5.0.1",
     "styled-components": "^6.1.13",
     "web-vitals": "^2.1.4",
+    "web3": "^4.16.0",
     "yup": "^1.4.0"
   },
   "scripts": {
@@ -45,5 +44,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "react-scripts": "^5.0.1"
   }
 }
