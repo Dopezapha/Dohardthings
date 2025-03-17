@@ -3,8 +3,8 @@
 // import { StacksTestnet } from '@stacks/network';
 
 // Define your contract details
-const CONTRACT_ADDRESS = "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9"
-const CONTRACT_NAME = "flash-lend"
+const CONTRACT_ADDRESS = "STX4HSE7ZANXM0R9HE06Z6ZCX5KCZK5XS7SAKTT0"
+const CONTRACT_NAME = "flash_lend"
 
 // Helper function to check if contract exists
 export async function checkContractExists() {
@@ -27,7 +27,7 @@ export async function getTotalLiquidity() {
     // Check if contract exists first
     const contractExists = await checkContractExists()
     if (!contractExists) {
-      throw new Error('NoSuchContract("SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.flash-lend")')
+      throw new Error('NoSuchContract("STX4HSE7ZANXM0R9HE06Z6ZCX5KCZK5XS7SAKTT0.flash_loan")')
     }
 
     // Your existing implementation here
@@ -53,7 +53,7 @@ export async function getFlashLoanFee() {
     // Check if contract exists first
     const contractExists = await checkContractExists()
     if (!contractExists) {
-      throw new Error('NoSuchContract("SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.flash-lend")')
+      throw new Error('NoSuchContract("STX4HSE7ZANXM0R9HE06Z6ZCX5KCZK5XS7SAKTT0.flash_loan")')
     }
 
     // Your existing implementation here
@@ -71,7 +71,7 @@ export async function getUserProtocolData(userAddress) {
     // Check if contract exists first
     const contractExists = await checkContractExists()
     if (!contractExists) {
-      throw new Error('NoSuchContract("SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.flash-lend")')
+      throw new Error('NoSuchContract("STX4HSE7ZANXM0R9HE06Z6ZCX5KCZK5XS7SAKTT0.flash_loan")')
     }
 
     // Your existing implementation here

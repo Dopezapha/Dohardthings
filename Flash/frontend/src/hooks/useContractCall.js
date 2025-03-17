@@ -10,8 +10,8 @@ const STACKS_TESTNET = {
   networkId: "testnet",
 }
 
-const DEFAULT_CONTRACT_ADDRESS = ""
-const DEFAULT_CONTRACT_NAME = ""
+const DEFAULT_CONTRACT_ADDRESS = "STX4HSE7ZANXM0R9HE06Z6ZCX5KCZK5XS7SAKTT0"
+const DEFAULT_CONTRACT_NAME = "flash_loan"
 
 /**
  * Hook for making contract calls to Stacks blockchain

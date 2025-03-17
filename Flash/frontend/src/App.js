@@ -26,6 +26,11 @@ const App = () => {
   const appConfig = useMemo(() => new AppConfig(["store_write", "publish_data"]), [])
   const userSession = useMemo(() => new UserSession({ appConfig }), [appConfig])
 
+  // Make userSession available globally
+  useEffect(() => {
+    window.userSession = userSession
+  }, [userSession])
+
   // Define appDetails with better app icon handling
   const appDetails = useMemo(
     () => ({

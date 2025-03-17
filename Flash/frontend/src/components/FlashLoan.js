@@ -17,8 +17,8 @@ const FlashLoan = ({ account }) => {
   // Create a contract object with the necessary properties
   const contract = account
     ? {
-        contractAddress: "SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9", // Use the default or get from props
-        contractName: "flash-lend", // Use the default contract name
+        contractAddress: "STX4HSE7ZANXM0R9HE06Z6ZCX5KCZK5XS7SAKTT0", // Use the default or get from props
+        contractName: "flash_loan", // Use the default contract name
       }
     : null
 
